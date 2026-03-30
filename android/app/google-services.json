@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "377718802756",
+    "project_id": "nragroup-kar-pro",
+    "storage_bucket": "nragroup-kar-pro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:377718802756:android:0e2afb81b9e47d62962f11",
+        "android_client_info": {
+          "package_name": "com.example.nra_pro_kar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdxev9HGPyUMov3JThzROzIq7HGUgZSxc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,37 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "nragroup-kar-pro",
+          "appId": "1:377718802756:android:0e2afb81b9e47d62962f11",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "nragroup-kar-pro",
+          "configurations": {
+            "android": "1:377718802756:android:0e2afb81b9e47d62962f11",
+            "ios": "1:377718802756:ios:c3bfa492ea891948962f11",
+            "web": "1:377718802756:web:876bed214a8c4bf1962f11"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
