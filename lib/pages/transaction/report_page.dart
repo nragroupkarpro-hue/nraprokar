@@ -323,7 +323,7 @@ class _ReportPageState extends State<ReportPage> {
                 Map<String, ItemSummary> summaryMap = {};
                 double grandMasuk = 0;
                 double grandKeluar = 0;
-
+                  
                 for (var tx in transactions) {
                   final itemName =
                       tx.itemName.isNotEmpty ? tx.itemName : 'Barang Lainnya';
@@ -342,7 +342,7 @@ class _ReportPageState extends State<ReportPage> {
                     grandKeluar += tx.amount;
                   }
                 }
-
+              
                 List<ItemSummary> summaryList = summaryMap.values.toList();
                 // Urutkan alfabetis
                 summaryList.sort((a, b) => a.itemName.compareTo(b.itemName));
@@ -351,9 +351,9 @@ class _ReportPageState extends State<ReportPage> {
 
                 return Column(
                   children: [
-                    // ==========================================
+                    // =============================================
                     // 3. KARTU RINGKASAN GLOBAL (ATAS)
-                    // ==========================================
+                    // =============================================
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Container(
