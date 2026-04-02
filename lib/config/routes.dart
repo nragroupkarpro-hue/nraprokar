@@ -7,7 +7,7 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
 
   static Map<String, WidgetBuilder> routes = {
-    login: (_) => LoginPage(),
-    dashboard: (_) => DashboardPage(),
+    login: (context) => LoginPage(),
+    dashboard: (context) => DashboardPage(),
   };
 }

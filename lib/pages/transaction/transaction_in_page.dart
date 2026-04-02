@@ -86,14 +86,13 @@ class _TransactionInPageState extends State<TransactionInPage> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color:
-                            isPriceUp
-                                ? Colors.red.shade100
-                                : Colors.green.shade100,
+                        color: isPriceUp
+                            ? Colors.red.shade100
+                            : Colors.green.shade100,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '$priceChangeIcon ${priceDiff.toStringAsFixed(0)}',
+                        '$priceChangeIcon ${priceDiff.abs().toStringAsFixed(0)}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -104,20 +103,50 @@ class _TransactionInPageState extends State<TransactionInPage> {
                 ],
               ),
             ],
-            if (quantity > 0)
+            if (quantity > 0) ...[
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   'Preview stok setelah transaksi: ${type == "pengeluaran" ? cat.kuantitas - quantity : cat.kuantitas + quantity} ${cat.satuan}',
                   style: TextStyle(
-                    color:
-                        type == "pengeluaran" && cat.kuantitas - quantity < 0
-                            ? Colors.red
-                            : Colors.teal,
+                    color: type == "pengeluaran" && cat.kuantitas - quantity < 0
+                        ? Colors.red
+                        : Colors.teal,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
+              if (type == "pemasukan")
+                Builder(
+                  builder: (context) {
+                    double priceInput =
+                        double.tryParse(priceController.text) ?? 0;
+                    if (priceInput > 0) {
+                      double modalLama = cat.totalModal;
+                      if (modalLama == 0 && cat.kuantitas > 0) {
+                        modalLama = cat.kuantitas * cat.hargaPerUnit;
+                      }
+
+                      double modalBaru = modalLama + (quantity * priceInput);
+                      int stokBaru = cat.kuantitas + quantity;
+                      double estimasiRataRata =
+                          stokBaru > 0 ? modalBaru / stokBaru : 0;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Estimasi Harga Rata-rata: Rp ${estimasiRataRata.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+            ],
           ],
         ),
       ),
@@ -198,44 +227,30 @@ class _TransactionInPageState extends State<TransactionInPage> {
 
                     List<TransactionModel> transactions = trxSnap.data!;
 
-                    // show only pemasukan entries
-                    transactions =
-                        transactions
-                            .where((trx) => trx.type == 'pemasukan')
-                            .toList();
+                    transactions = transactions
+                        .where((trx) => trx.type == 'pemasukan')
+                        .toList();
 
                     if (_selectedFilter != null && _filterMode == 1) {
-                      transactions =
-                          transactions
-                              .where(
-                                (trx) =>
-                                    trx.date.year == _selectedFilter!.year &&
-                                    trx.date.month == _selectedFilter!.month,
-                              )
-                              .toList();
-                      _resetPage();
+                      transactions = transactions
+                          .where((trx) =>
+                              trx.date.year == _selectedFilter!.year &&
+                              trx.date.month == _selectedFilter!.month)
+                          .toList();
                     }
 
                     if (descriptionFilterController.text.isNotEmpty) {
                       final filterText =
                           descriptionFilterController.text.toLowerCase();
-                      transactions =
-                          transactions
-                              .where(
-                                (trx) =>
-                                    trx.title.toLowerCase().contains(
-                                      filterText,
-                                    ) ||
-                                    trx.itemName.toLowerCase().contains(
-                                      filterText,
-                                    ) ||
-                                    (trx.description?.toLowerCase().contains(
-                                          filterText,
-                                        ) ??
-                                        false),
-                              )
-                              .toList();
-                      _resetPage();
+                      transactions = transactions
+                          .where((trx) =>
+                              trx.title.toLowerCase().contains(filterText) ||
+                              trx.itemName.toLowerCase().contains(filterText) ||
+                              (trx.description
+                                      ?.toLowerCase()
+                                      .contains(filterText) ??
+                                  false))
+                          .toList();
                     }
 
                     if (transactions.isEmpty) {
@@ -258,7 +273,6 @@ class _TransactionInPageState extends State<TransactionInPage> {
                       );
                     }
 
-                    // Hitung pagination
                     final totalPages =
                         (transactions.length / _itemsPerPage).ceil();
                     final startIndex = _currentPage * _itemsPerPage;
@@ -277,13 +291,13 @@ class _TransactionInPageState extends State<TransactionInPage> {
                           child: ListView.separated(
                             padding: const EdgeInsets.all(12),
                             itemCount: paginatedTransactions.length,
-                            separatorBuilder:
-                                (_, __) => const SizedBox(height: 8),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
                             itemBuilder: (context, index) {
                               final trx = paginatedTransactions[index];
                               final cat = catMap[trx.categoryId];
-                              final catName =
-                                  cat?.namaBarang ?? 'Barang tidak ditemukan';
+                              final catName = cat?.namaBarang ??
+                                  'Barang tidak ditemukan';
 
                               return Card(
                                 elevation: 2,
@@ -291,20 +305,19 @@ class _TransactionInPageState extends State<TransactionInPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: ListTile(
-                                  onTap: () => _showTransactionDetail(trx, cat),
+                                  onTap: () =>
+                                      _showTransactionDetail(trx, cat),
                                   leading: CircleAvatar(
-                                    backgroundColor:
-                                        trx.type == 'pengeluaran'
-                                            ? Colors.red.shade100
-                                            : Colors.green.shade100,
+                                    backgroundColor: trx.type == 'pengeluaran'
+                                        ? Colors.red.shade100
+                                        : Colors.green.shade100,
                                     child: Icon(
                                       trx.type == 'pengeluaran'
                                           ? Icons.arrow_downward
                                           : Icons.arrow_upward,
-                                      color:
-                                          trx.type == 'pengeluaran'
-                                              ? Colors.red
-                                              : Colors.green,
+                                      color: trx.type == 'pengeluaran'
+                                          ? Colors.red
+                                          : Colors.green,
                                     ),
                                   ),
                                   title: Text(
@@ -337,10 +350,9 @@ class _TransactionInPageState extends State<TransactionInPage> {
                                   trailing: Text(
                                     currency.format(trx.amount),
                                     style: TextStyle(
-                                      color:
-                                          trx.type == 'pengeluaran'
-                                              ? Colors.red
-                                              : Colors.green,
+                                      color: trx.type == 'pengeluaran'
+                                          ? Colors.red
+                                          : Colors.green,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
                                     ),
@@ -350,7 +362,6 @@ class _TransactionInPageState extends State<TransactionInPage> {
                             },
                           ),
                         ),
-                        // Pagination Controls
                         if (totalPages > 1)
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -364,13 +375,13 @@ class _TransactionInPageState extends State<TransactionInPage> {
                               ),
                             ),
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
                               children: [
                                 ElevatedButton.icon(
-                                  onPressed:
-                                      _currentPage > 0
-                                          ? () => setState(() => _currentPage--)
-                                          : null,
+                                  onPressed: _currentPage > 0
+                                      ? () => setState(() => _currentPage--)
+                                      : null,
                                   icon: const Icon(Icons.arrow_back, size: 18),
                                   label: const Text('Sebelumnya'),
                                 ),
@@ -382,10 +393,9 @@ class _TransactionInPageState extends State<TransactionInPage> {
                                   ),
                                 ),
                                 ElevatedButton.icon(
-                                  onPressed:
-                                      _currentPage < totalPages - 1
-                                          ? () => setState(() => _currentPage++)
-                                          : null,
+                                  onPressed: _currentPage < totalPages - 1
+                                      ? () => setState(() => _currentPage++)
+                                      : null,
                                   icon: const Icon(
                                     Icons.arrow_forward,
                                     size: 18,
@@ -417,7 +427,7 @@ class _TransactionInPageState extends State<TransactionInPage> {
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setStateBottomSheet) {
             return Container(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -434,8 +444,8 @@ class _TransactionInPageState extends State<TransactionInPage> {
                       value: 0,
                       groupValue: _filterMode,
                       onChanged: (val) {
-                        setState(() => _filterMode = val as int);
-                        this.setState(() {});
+                        setStateBottomSheet(() => _filterMode = val as int);
+                        setState(() {});
                       },
                     ),
                   ),
@@ -445,8 +455,8 @@ class _TransactionInPageState extends State<TransactionInPage> {
                       value: 1,
                       groupValue: _filterMode,
                       onChanged: (val) {
-                        setState(() => _filterMode = val as int);
-                        this.setState(() {});
+                        setStateBottomSheet(() => _filterMode = val as int);
+                        setState(() {});
                       },
                     ),
                   ),
@@ -460,8 +470,8 @@ class _TransactionInPageState extends State<TransactionInPage> {
                           lastDate: DateTime.now(),
                         );
                         if (picked != null) {
-                          setState(() => _selectedFilter = picked);
-                          this.setState(() {});
+                          setStateBottomSheet(() => _selectedFilter = picked);
+                          setState(() {});
                         }
                       },
                       child: Text(
@@ -476,21 +486,20 @@ class _TransactionInPageState extends State<TransactionInPage> {
                     decoration: InputDecoration(
                       labelText: 'Cari berdasarkan judul/nama item',
                       border: const OutlineInputBorder(),
-                      suffixIcon:
-                          descriptionFilterController.text.isNotEmpty
-                              ? IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  descriptionFilterController.clear();
-                                  setState(() {});
-                                  this.setState(() {});
-                                },
-                              )
-                              : null,
+                      suffixIcon: descriptionFilterController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                descriptionFilterController.clear();
+                                setStateBottomSheet(() {});
+                                setState(() {});
+                              },
+                            )
+                          : null,
                     ),
                     onChanged: (val) {
+                      setStateBottomSheet(() {});
                       setState(() {});
-                      this.setState(() {});
                     },
                   ),
                   const SizedBox(height: 16),
@@ -559,10 +568,9 @@ class _TransactionInPageState extends State<TransactionInPage> {
                           trx.type == 'pengeluaran'
                               ? 'Pengeluaran'
                               : 'Pemasukan',
-                          color:
-                              trx.type == 'pengeluaran'
-                                  ? Colors.red
-                                  : Colors.green,
+                          color: trx.type == 'pengeluaran'
+                              ? Colors.red
+                              : Colors.green,
                         ),
                         const Divider(),
                         _buildDetailRow(
@@ -599,35 +607,36 @@ class _TransactionInPageState extends State<TransactionInPage> {
                   Navigator.pop(context);
                   final confirm = await showDialog<bool>(
                     context: context,
-                    builder:
-                        (context) => AlertDialog(
-                          title: const Text('Hapus Transaksi?'),
-                          content: const Text(
-                            'Apakah Anda yakin ingin menghapus transaksi ini?\n\nTindakan ini tidak dapat dibatalkan.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Batal'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: const Text(
-                                'Hapus',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ),
-                          ],
+                    builder: (context) => AlertDialog(
+                      title: const Text('Hapus Transaksi?'),
+                      content: const Text(
+                        'Apakah Anda yakin ingin menghapus transaksi ini?\n\nStok dan Harga Rata-rata akan dikembalikan ke sebelum transaksi ini.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Batal'),
                         ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text(
+                            'Hapus',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                   if (confirm ?? false) {
-                    await service.deleteTransaction(trx.id!);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Transaksi berhasil dihapus'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    await service.deleteTransactionWithStock(trx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Transaksi berhasil dihapus dan stok dikembalikan'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
                   }
                 },
                 child: const Text('Hapus', style: TextStyle(color: Colors.red)),
@@ -665,39 +674,33 @@ class _TransactionInPageState extends State<TransactionInPage> {
 
   void _showEditTransactionDialog(TransactionModel trx, CategoryModel? cat) {
     final titleController = TextEditingController(text: trx.title);
-    final descriptionController = TextEditingController(
-      text: trx.description ?? '',
-    );
-    final quantityController = TextEditingController(
-      text: trx.quantity.toInt().toString(),
-    );
+    final descriptionController =
+        TextEditingController(text: trx.description ?? '');
+    final quantityController =
+        TextEditingController(text: trx.quantity.toInt().toString());
     final unitController = TextEditingController(text: trx.unit);
     final itemCodeController = TextEditingController(text: trx.itemCode);
-    final priceController = TextEditingController(
-      text: trx.pricePerUnit.toString(),
-    );
+    final priceController =
+        TextEditingController(text: trx.pricePerUnit.toString());
 
     DateTime selectedDate = trx.date;
     String selectedType = trx.type;
 
-    // we'll keep track of the category found by kode inside this dialog
     CategoryModel? found = cat;
     String? editingCategoryId = cat?.id;
-
-    // initialize preview quantity so stock info is correct
     quantity = trx.quantity.toInt();
 
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setStateDialog) {
             Future<void> lookupInDialog() async {
               final code = itemCodeController.text.trim();
               if (code.isEmpty) return;
               final c = await service.getCategoryByCode(code);
               if (c == null) {
-                setState(() {
+                setStateDialog(() {
                   found = null;
                   editingCategoryId = null;
                 });
@@ -708,7 +711,7 @@ class _TransactionInPageState extends State<TransactionInPage> {
                   ),
                 );
               } else {
-                setState(() {
+                setStateDialog(() {
                   found = c;
                   editingCategoryId = c.id;
                   unitController.text = c.satuan;
@@ -743,7 +746,7 @@ class _TransactionInPageState extends State<TransactionInPage> {
                       onEditingComplete: lookupInDialog,
                       onChanged: (val) {
                         if (found != null) {
-                          setState(() {
+                          setStateDialog(() {
                             found = null;
                             editingCategoryId = null;
                           });
@@ -775,33 +778,36 @@ class _TransactionInPageState extends State<TransactionInPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    // --- PERBAIKAN: KUNCI (DISABLE) INPUT JUMLAH SAAT EDIT ---
                     TextField(
                       controller: quantityController,
                       keyboardType: TextInputType.number,
+                      readOnly: true, 
                       decoration: InputDecoration(
-                        labelText: "Jumlah (Wajib)",
+                        labelText: "Jumlah (Hapus transaksi jika ingin diubah)",
+                        filled: true, 
+                        fillColor: Colors.grey.shade200, 
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         prefixIcon: const Icon(Icons.inventory),
                       ),
-                      onChanged:
-                          (val) => setState(() {
-                            quantity = int.tryParse(val) ?? 0;
-                          }),
                     ),
                     const SizedBox(height: 12),
+                    // --- PERBAIKAN: KUNCI (DISABLE) INPUT HARGA SAAT EDIT ---
                     TextField(
                       controller: priceController,
                       keyboardType: TextInputType.number,
+                      readOnly: true, 
                       decoration: InputDecoration(
-                        labelText: "Harga per Unit Rp (Wajib)",
+                        labelText: "Harga/Unit (Hapus transaksi untuk ubah)",
+                        filled: true, 
+                        fillColor: Colors.grey.shade200, 
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         prefixIcon: const Icon(Icons.attach_money),
                       ),
-                      onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 12),
                     Builder(
@@ -856,17 +862,6 @@ class _TransactionInPageState extends State<TransactionInPage> {
                         );
                         return;
                       }
-                      if (qty < 0 || price < 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              '⚠️ Jumlah dan harga tidak boleh negatif',
-                            ),
-                            backgroundColor: Colors.orange,
-                          ),
-                        );
-                        return;
-                      }
 
                       final updated = TransactionModel(
                         id: trx.id,
@@ -888,12 +883,14 @@ class _TransactionInPageState extends State<TransactionInPage> {
 
                       await service.updateTransaction(trx.id!, updated);
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        const SnackBar(
-                          content: Text('✅ Transaksi berhasil diupdate'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('✅ Transaksi berhasil diupdate'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -930,13 +927,13 @@ class _TransactionInPageState extends State<TransactionInPage> {
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setStateDialog) {
             Future<void> lookupInDialog() async {
               final code = itemCodeController.text.trim();
               if (code.isEmpty) return;
               final cat = await service.getCategoryByCode(code);
               if (cat == null) {
-                setState(() {
+                setStateDialog(() {  
                   _foundCategory = null;
                   selectedCategoryId = null;
                 });
@@ -947,7 +944,7 @@ class _TransactionInPageState extends State<TransactionInPage> {
                   ),
                 );
               } else {
-                setState(() {
+                setStateDialog(() {
                   _foundCategory = cat;
                   selectedCategoryId = cat.id;
                   unitController.text = cat.satuan;
@@ -957,7 +954,7 @@ class _TransactionInPageState extends State<TransactionInPage> {
                 });
               }
             }
-
+  
             return AlertDialog(
               title: const Text('Tambah Pemasukan'),
               content: SingleChildScrollView(
@@ -982,7 +979,7 @@ class _TransactionInPageState extends State<TransactionInPage> {
                       onEditingComplete: lookupInDialog,
                       onChanged: (val) {
                         if (_foundCategory != null) {
-                          setState(() {
+                          setStateDialog(() {
                             _foundCategory = null;
                             selectedCategoryId = null;
                           });
@@ -1011,7 +1008,7 @@ class _TransactionInPageState extends State<TransactionInPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         prefixIcon: const Icon(Icons.title),
-                        hintText: 'Misal: Penerimaan Barang, Pemakaian',
+                        hintText: 'Misal: Penerimaan Barang',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1025,10 +1022,9 @@ class _TransactionInPageState extends State<TransactionInPage> {
                         ),
                         prefixIcon: const Icon(Icons.inventory),
                       ),
-                      onChanged:
-                          (val) => setState(() {
-                            quantity = int.tryParse(val) ?? 0;
-                          }),
+                      onChanged: (val) => setStateDialog(() {
+                        quantity = int.tryParse(val) ?? 0;
+                      }),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1041,7 +1037,7 @@ class _TransactionInPageState extends State<TransactionInPage> {
                         ),
                         prefixIcon: const Icon(Icons.attach_money),
                       ),
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) => setStateDialog(() {}),
                     ),
                     const SizedBox(height: 12),
                     Builder(
@@ -1128,12 +1124,14 @@ class _TransactionInPageState extends State<TransactionInPage> {
 
                       await service.addTransaction(transaction);
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        const SnackBar(
-                          content: Text('✅ Transaksi berhasil ditambahkan'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('✅ Transaksi berhasil ditambahkan'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(

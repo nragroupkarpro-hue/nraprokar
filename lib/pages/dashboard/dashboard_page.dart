@@ -16,6 +16,9 @@ import 'package:collection/collection.dart';
 import '../../services/firestore_service.dart';
 import '../../models/transaction_model.dart';
 import '../../models/category_model.dart';
+import 'package:nra_pro_kar/pages/transaction/add_transaction_general_page.dart'; // <--- Tambahkan baris ini
+import 'package:nra_pro_kar/pages/transaction/transaction_data_page.dart'; 
+// pastikan path importnya sesuai dengan nama folder Anda
 
 class DashboardPage extends StatefulWidget {
   @override
@@ -109,17 +112,10 @@ class _DashboardPageState extends State<DashboardPage> {
                     children: [
                       _menuCard(
                         context,
-                        "Pemasukan",
-                        Icons.arrow_downward,
-                        TransactionInPage(),
+                        "Data Transaksi", // <--- Nama Menu Baru
+                        Icons.compare_arrows, // Icon yang cocok
+                        const TransactionDataPage(), // <--- Memanggil halaman gabungan yang baru kita buat
                         Colors.blue.shade400,
-                      ),
-                      _menuCard(
-                        context,
-                        "Pengeluaran",
-                        Icons.arrow_upward,
-                        TransactionOutPage(),
-                        Colors.red.shade400,
                       ),
                       _menuCard(
                         context,

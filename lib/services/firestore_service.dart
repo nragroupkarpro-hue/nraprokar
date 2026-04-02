@@ -105,33 +105,66 @@ class FirestoreService {
   final CollectionReference transactionsRef = FirebaseFirestore.instance
       .collection('transactions');
 
-  Future<void> addTransaction(TransactionModel trx) async {
+Future<void> addTransaction(TransactionModel trx) async {
     await _db.runTransaction((transaction) async {
       final categoryRef = _db.collection('categories').doc(trx.categoryId);
-
       final snapshot = await transaction.get(categoryRef);
-      int kuantitas = snapshot['kuantitas'] ?? 0;
-      double currentPrice = (snapshot['hargaPerUnit'] ?? 0).toDouble();
 
-      if (trx.type == "pengeluaran") {
-        kuantitas -= trx.quantity.toInt();
+      if (!snapshot.exists) throw Exception("Kategori tidak ditemukan");
+
+      // 1. Ambil data kondisi saat ini dari database
+      int stokLama = (snapshot['kuantitas'] ?? 0).toInt();
+      double hargaRataRataLama = (snapshot['hargaPerUnit'] ?? 0).toDouble();
+      double totalModalLama = (snapshot['totalModal'] ?? 0).toDouble();
+
+      int stokBaru;
+      double totalModalBaru;
+      double hargaRataRataBaru;
+
+      if (trx.type == "pemasukan") {
+        // --- LOGIKA AVERAGE PRICE (BARANG MASUK) ---
+        stokBaru = stokLama + trx.quantity.toInt();
+        
+        // Modal bertambah: (Jumlah beli * Harga beli hari ini)
+        double modalMasuk = trx.quantity * trx.pricePerUnit;
+        totalModalBaru = totalModalLama + modalMasuk;
+        
+        // Final Price = Total Modal / Total Stok
+        hargaRataRataBaru = totalModalBaru / stokBaru;
+        
       } else {
-        kuantitas += trx.quantity.toInt();
+        // --- LOGIKA PENGELUARAN (BARANG KELUAR / JUAL) ---
+        if (stokLama < trx.quantity) throw Exception("Stok tidak mencukupi!");
+        
+        stokBaru = stokLama - trx.quantity.toInt();
+        
+        // Modal berkurang mengikuti harga rata-rata saat ini
+        totalModalBaru = totalModalLama - (trx.quantity * hargaRataRataLama);
+        hargaRataRataBaru = hargaRataRataLama; // Harga rata-rata tidak berubah jika barang keluar
       }
 
-      // Tracking harga: jika harga transaksi berbeda dari harga kategori, update
-      final Map<String, dynamic> updateData = {'kuantitas': kuantitas};
-      if ((currentPrice - trx.pricePerUnit).abs() > 0.01) {
-        // Harga berbeda - track perubahan
-        updateData['lastPrice'] = currentPrice;
-        updateData['hargaPerUnit'] = trx.pricePerUnit;
+      // 2. Siapkan data yang akan di-update ke Firebase
+      final Map<String, dynamic> updateData = {
+        'kuantitas': stokBaru,
+        'hargaPerUnit': hargaRataRataBaru, // Harga sudah jadi rata-rata
+        'totalModal': totalModalBaru, // Simpan modal untuk perhitungan berikutnya
+        'jumlahHarga': stokBaru * hargaRataRataBaru, // Total Nilai Aset
+      };
+
+      // 3. Track perubahan harga jika ini barang masuk dan harga rata-rata berubah
+      if (trx.type == "pemasukan" && (hargaRataRataLama - hargaRataRataBaru).abs() > 0.01) {
+        updateData['lastPrice'] = hargaRataRataLama;
         updateData['lastPriceUpdate'] = FieldValue.serverTimestamp();
       }
 
+      // 4. Eksekusi simpan ke Firebase
       transaction.update(categoryRef, updateData);
       transaction.set(transactionsRef.doc(), trx.toMap());
     });
   }
+
+
+
 
   Future<void> addTransactionWithStock(TransactionModel trx) async {
     await _db.runTransaction((transaction) async {
@@ -163,38 +196,48 @@ class FirestoreService {
     await transactionsRef.doc(id).delete();
   }
 
-  Future<void> deleteTransactionWithStock(
-    String id,
-    String categoryId,
-    int quantity,
-    String type,
-  ) async {
+/// Menghapus transaksi dan mengembalikan (revert) stok serta modal (Average)
+  Future<void> deleteTransactionWithStock(TransactionModel trx) async {
     await _db.runTransaction((transaction) async {
-      final categoryRef = _db.collection('categories').doc(categoryId);
-      final transactionRef = transactionsRef.doc(id);
-
+      final categoryRef = categoriesRef.doc(trx.categoryId);
       final categorySnap = await transaction.get(categoryRef);
 
-      if (!categorySnap.exists) {
-        throw Exception("Kategori tidak ditemukan");
-      }
+      if (!categorySnap.exists) throw Exception("Kategori tidak ditemukan");
 
-      int currentStock = categorySnap['kuantitas'] ?? 0;
+      int currentStock = (categorySnap['kuantitas'] ?? 0).toInt();
+      double currentModal = (categorySnap['totalModal'] ?? 0).toDouble();
 
-      // Reverse the transaction effect
-      if (type == "pengeluaran") {
-        // Add back the quantity that was subtracted
-        currentStock += quantity;
+      int stockReverted;
+      double modalReverted;
+
+      if (trx.type == "pemasukan") {
+        // Jika batal beli (pemasukan dihapus), kurangi stok dan kurangi modal
+        stockReverted = currentStock - trx.quantity.toInt();
+        modalReverted = currentModal - (trx.quantity * trx.pricePerUnit);
       } else {
-        // Subtract the quantity that was added
-        currentStock -= quantity;
+        // Jika batal jual (pengeluaran dihapus), tambah stok dan tambah modal
+        stockReverted = currentStock + trx.quantity.toInt();
+        // Asumsi modal kembali seharga rata-rata saat ini
+        modalReverted = currentModal + (trx.quantity * (categorySnap['hargaPerUnit'] ?? 0));
       }
 
-      transaction.update(categoryRef, {'kuantitas': currentStock});
-      transaction.delete(transactionRef);
+      // Hitung kembali harga rata-rata setelah di-revert
+      double newAvg = stockReverted > 0 ? modalReverted / stockReverted : 0;
+
+      // Update kategori
+      transaction.update(categoryRef, {
+        'kuantitas': stockReverted,
+        'totalModal': modalReverted,
+        'hargaPerUnit': newAvg,
+        'jumlahHarga': stockReverted * newAvg,
+      });
+      
+      // Hapus data transaksinya
+      transaction.delete(transactionsRef.doc(trx.id));
     });
   }
 
+  
   Future<void> updateTransaction(String id, TransactionModel trx) async {
     await transactionsRef.doc(id).update({
       'itemName': trx.itemName,

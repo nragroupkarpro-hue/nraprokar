@@ -6,8 +6,7 @@ class TransactionService {
 
   Future<void> addTransaction(TransactionModel trx) async {
     await _db.runTransaction((transaction) async {
-      final categoryRef =
-          _db.collection('categories').doc(trx.categoryId);
+      final categoryRef = _db.collection('categories').doc(trx.categoryId);
 
       final snapshot = await transaction.get(categoryRef);
       int stock = snapshot['stock'];
@@ -24,7 +23,8 @@ class TransactionService {
   }
 
   Stream<QuerySnapshot> getTransactions() {
-    return _db.collection('transactions')
+    return _db
+        .collection('transactions')
         .orderBy('createdAt', descending: true)
         .snapshots();
   }
