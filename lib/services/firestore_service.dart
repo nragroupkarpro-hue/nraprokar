@@ -6,14 +6,49 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   /// ===============================
+  /// LOKASI / TEMPAT SECTION (FITUR BARU)
+  /// ===============================
+  final CollectionReference locationsRef = FirebaseFirestore.instance
+      .collection('locations');
+
+  Future<void> addLocation(String name) async {
+    await locationsRef.add({
+      'name': name,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> updateLocation(String id, String name) async {
+    await locationsRef.doc(id).update({'name': name});
+  }
+
+  Future<void> deleteLocation(String id) async {
+    await locationsRef.doc(id).delete();
+  }
+
+  Stream<List<Map<String, dynamic>>> getLocations() {
+    return locationsRef
+        .orderBy('createdAt')
+        .snapshots()
+        .map(
+          (snap) =>
+              snap.docs
+                  .map((doc) => {'id': doc.id, 'name': doc['name']})
+                  .toList(),
+        );
+  }
+
+  /// ===============================
   /// CATEGORY SECTION
   /// ===============================
 
   final CollectionReference categoriesRef = FirebaseFirestore.instance
       .collection('categories');
 
-  Future<void> addCategory(CategoryModel category) async {
-    await categoriesRef.add(category.toFirestore());
+  Future<String> addCategory(CategoryModel category) async {
+    final docRef = await categoriesRef.add(category.toFirestore());
+    return docRef
+        .id; // Mengembalikan ID agar bisa dipakai untuk transaksi otomatis
   }
 
   Future<void> updateCategory(String id, CategoryModel category) async {
@@ -105,66 +140,44 @@ class FirestoreService {
   final CollectionReference transactionsRef = FirebaseFirestore.instance
       .collection('transactions');
 
-Future<void> addTransaction(TransactionModel trx) async {
+  Future<void> addTransaction(TransactionModel trx) async {
     await _db.runTransaction((transaction) async {
       final categoryRef = _db.collection('categories').doc(trx.categoryId);
       final snapshot = await transaction.get(categoryRef);
 
       if (!snapshot.exists) throw Exception("Kategori tidak ditemukan");
 
-      // 1. Ambil data kondisi saat ini dari database
       int stokLama = (snapshot['kuantitas'] ?? 0).toInt();
-      double hargaRataRataLama = (snapshot['hargaPerUnit'] ?? 0).toDouble();
-      double totalModalLama = (snapshot['totalModal'] ?? 0).toDouble();
+      // MENGAMBIL HARGA SEBELUMNYA (TIDAK PAKAI AVERAGE)
+      double hargaTetap = (snapshot['hargaPerUnit'] ?? 0).toDouble();
 
       int stokBaru;
-      double totalModalBaru;
-      double hargaRataRataBaru;
-
       if (trx.type == "pemasukan") {
-        // --- LOGIKA AVERAGE PRICE (BARANG MASUK) ---
         stokBaru = stokLama + trx.quantity.toInt();
-        
-        // Modal bertambah: (Jumlah beli * Harga beli hari ini)
-        double modalMasuk = trx.quantity * trx.pricePerUnit;
-        totalModalBaru = totalModalLama + modalMasuk;
-        
-        // Final Price = Total Modal / Total Stok
-        hargaRataRataBaru = totalModalBaru / stokBaru;
-        
       } else {
-        // --- LOGIKA PENGELUARAN (BARANG KELUAR / JUAL) ---
         if (stokLama < trx.quantity) throw Exception("Stok tidak mencukupi!");
-        
         stokBaru = stokLama - trx.quantity.toInt();
-        
-        // Modal berkurang mengikuti harga rata-rata saat ini
-        totalModalBaru = totalModalLama - (trx.quantity * hargaRataRataLama);
-        hargaRataRataBaru = hargaRataRataLama; // Harga rata-rata tidak berubah jika barang keluar
       }
 
-      // 2. Siapkan data yang akan di-update ke Firebase
+      // UPDATE STOK SAJA, HARGA TETAP MENGGUNAKAN HARGA LAMA/SEMULA
       final Map<String, dynamic> updateData = {
         'kuantitas': stokBaru,
-        'hargaPerUnit': hargaRataRataBaru, // Harga sudah jadi rata-rata
-        'totalModal': totalModalBaru, // Simpan modal untuk perhitungan berikutnya
-        'jumlahHarga': stokBaru * hargaRataRataBaru, // Total Nilai Aset
+        'hargaPerUnit': hargaTetap,
+        'totalModal': stokBaru * hargaTetap,
+        'jumlahHarga': stokBaru * hargaTetap,
       };
 
-      // 3. Track perubahan harga jika ini barang masuk dan harga rata-rata berubah
-      if (trx.type == "pemasukan" && (hargaRataRataLama - hargaRataRataBaru).abs() > 0.01) {
-        updateData['lastPrice'] = hargaRataRataLama;
-        updateData['lastPriceUpdate'] = FieldValue.serverTimestamp();
-      }
-
-      // 4. Eksekusi simpan ke Firebase
       transaction.update(categoryRef, updateData);
-      transaction.set(transactionsRef.doc(), trx.toMap());
+
+      // SIMPAN TRANSAKSI DENGAN HARGA TETAP TERSEBUT
+      Map<String, dynamic> trxData = trx.toMap();
+      trxData['pricePerUnit'] = hargaTetap;
+      trxData['totalPrice'] = trx.quantity * hargaTetap;
+      trxData['amount'] = trx.quantity * hargaTetap;
+
+      transaction.set(transactionsRef.doc(), trxData);
     });
   }
-
-
-
 
   Future<void> addTransactionWithStock(TransactionModel trx) async {
     await _db.runTransaction((transaction) async {
@@ -196,7 +209,6 @@ Future<void> addTransaction(TransactionModel trx) async {
     await transactionsRef.doc(id).delete();
   }
 
-/// Menghapus transaksi dan mengembalikan (revert) stok serta modal (Average)
   Future<void> deleteTransactionWithStock(TransactionModel trx) async {
     await _db.runTransaction((transaction) async {
       final categoryRef = categoriesRef.doc(trx.categoryId);
@@ -205,39 +217,84 @@ Future<void> addTransaction(TransactionModel trx) async {
       if (!categorySnap.exists) throw Exception("Kategori tidak ditemukan");
 
       int currentStock = (categorySnap['kuantitas'] ?? 0).toInt();
-      double currentModal = (categorySnap['totalModal'] ?? 0).toDouble();
+      // MENGAMBIL HARGA SEBELUMNYA
+      double hargaTetap = (categorySnap['hargaPerUnit'] ?? 0).toDouble();
 
       int stockReverted;
-      double modalReverted;
-
       if (trx.type == "pemasukan") {
-        // Jika batal beli (pemasukan dihapus), kurangi stok dan kurangi modal
         stockReverted = currentStock - trx.quantity.toInt();
-        modalReverted = currentModal - (trx.quantity * trx.pricePerUnit);
       } else {
-        // Jika batal jual (pengeluaran dihapus), tambah stok dan tambah modal
         stockReverted = currentStock + trx.quantity.toInt();
-        // Asumsi modal kembali seharga rata-rata saat ini
-        modalReverted = currentModal + (trx.quantity * (categorySnap['hargaPerUnit'] ?? 0));
       }
 
-      // Hitung kembali harga rata-rata setelah di-revert
-      double newAvg = stockReverted > 0 ? modalReverted / stockReverted : 0;
-
-      // Update kategori
+      // KEMBALIKAN STOK SAJA, HARGA TETAP
       transaction.update(categoryRef, {
         'kuantitas': stockReverted,
-        'totalModal': modalReverted,
-        'hargaPerUnit': newAvg,
-        'jumlahHarga': stockReverted * newAvg,
+        'totalModal': stockReverted * hargaTetap,
+        'hargaPerUnit': hargaTetap,
+        'jumlahHarga': stockReverted * hargaTetap,
       });
-      
-      // Hapus data transaksinya
+
       transaction.delete(transactionsRef.doc(trx.id));
     });
   }
 
-  
+  Future<void> bulkDeleteCategories(List<String> ids) async {
+    final batch = _db.batch();
+    for (String id in ids) {
+      batch.delete(categoriesRef.doc(id));
+    }
+    await batch.commit();
+  }
+
+  Future<void> bulkDeleteTransactionsWithStock(
+    List<TransactionModel> transactions,
+  ) async {
+    await _db.runTransaction((transaction) async {
+      // Group by categoryId to minimize gets
+      final categoryUpdates = <String, int>{};
+
+      for (final trx in transactions) {
+        final categoryRef = categoriesRef.doc(trx.categoryId);
+        if (!categoryUpdates.containsKey(trx.categoryId)) {
+          final categorySnap = await transaction.get(categoryRef);
+          if (categorySnap.exists) {
+            categoryUpdates[trx.categoryId] =
+                (categorySnap['kuantitas'] ?? 0).toInt();
+          } else {
+            continue; // Skip if category not found
+          }
+        }
+
+        int currentStock = categoryUpdates[trx.categoryId]!;
+        int stockReverted;
+        if (trx.type == "pemasukan") {
+          stockReverted = currentStock - trx.quantity.toInt();
+        } else {
+          stockReverted = currentStock + trx.quantity.toInt();
+        }
+        categoryUpdates[trx.categoryId] = stockReverted;
+
+        transaction.delete(transactionsRef.doc(trx.id));
+      }
+
+      // Update all categories
+      for (final entry in categoryUpdates.entries) {
+        final categoryRef = categoriesRef.doc(entry.key);
+        final categorySnap = await transaction.get(categoryRef);
+        if (categorySnap.exists) {
+          double hargaTetap = (categorySnap['hargaPerUnit'] ?? 0).toDouble();
+          transaction.update(categoryRef, {
+            'kuantitas': entry.value,
+            'totalModal': entry.value * hargaTetap,
+            'hargaPerUnit': hargaTetap,
+            'jumlahHarga': entry.value * hargaTetap,
+          });
+        }
+      }
+    });
+  }
+
   Future<void> updateTransaction(String id, TransactionModel trx) async {
     await transactionsRef.doc(id).update({
       'itemName': trx.itemName,
@@ -309,6 +366,10 @@ Future<void> addTransaction(TransactionModel trx) async {
                           ? (data['createdAt'] as Timestamp).toDate()
                           : DateTime.parse(data['createdAt'].toString()),
                   description: data['description'],
+                  supplierName: data['supplierName'],
+                  supplierDetail: data['supplierDetail'],
+                  supplierNumber: data['supplierNumber'],
+                  suratJalan: data['suratJalan'],
                 );
               }).toList(),
         );

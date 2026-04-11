@@ -17,6 +17,11 @@ class CategoryModel {
   final DateTime? createdAt;
   final double totalModal; // Simpan total uang yang dikeluarkan (Modal)
 
+  String? supplierName;
+  String? supplierNumber;
+  String? supplierDetail;
+  String? suratJalan;
+
   CategoryModel({
     this.id,
     required this.namaBarang,
@@ -31,6 +36,10 @@ class CategoryModel {
     this.varianInfo,
     this.createdAt,
     this.totalModal = 0.0,
+    this.supplierName,
+    this.supplierNumber,
+    this.supplierDetail,
+    this.suratJalan,
   });
 
   Map<String, dynamic> toMap() {
@@ -43,20 +52,38 @@ class CategoryModel {
       'hargaPerUnit': hargaPerUnit,
       'jumlahHarga': jumlahHarga,
       'lastPrice': lastPrice,
-      'lastPriceUpdate': lastPriceUpdate != null ? Timestamp.fromDate(lastPriceUpdate!) : null,
+      'lastPriceUpdate':
+          lastPriceUpdate != null ? Timestamp.fromDate(lastPriceUpdate!) : null,
       'varianInfo': varianInfo,
       'totalModal': totalModal,
+      'supplierName': supplierName,
+      'supplierNumber': supplierNumber,
+      'supplierDetail': supplierDetail,
+      'suratJalan': suratJalan,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
     };
   }
 
   // Digunakan saat menulis ke Firestore (menambahkan server timestamp)
   Map<String, dynamic> toFirestore() {
-    final map = toMap();
-    if (createdAt == null) {
-      map['createdAt'] = FieldValue.serverTimestamp();
-    }
-    return map;
+    return {
+      'namaBarang': namaBarang,
+      'satuan': satuan,
+      'lokasi': lokasi,
+      'kodeBarang': kodeBarang,
+      'kuantitas': kuantitas,
+      'hargaPerUnit': hargaPerUnit,
+      'jumlahHarga': jumlahHarga,
+      'varianInfo': varianInfo,
+      'createdAt':
+          createdAt != null
+              ? Timestamp.fromDate(createdAt!)
+              : FieldValue.serverTimestamp(),
+      'supplierName': supplierName,
+      'supplierNumber': supplierNumber,
+      'supplierDetail': supplierDetail,
+      'suratJalan': suratJalan,
+    };
   }
 
   // Factory untuk data dari Map umum
@@ -71,27 +98,56 @@ class CategoryModel {
       hargaPerUnit: (map['hargaPerUnit'] ?? 0).toDouble(),
       jumlahHarga: (map['jumlahHarga'] ?? 0).toDouble(),
       totalModal: (map['totalModal'] ?? 0.0).toDouble(),
-      lastPrice: map['lastPrice'] != null ? (map['lastPrice'] as num).toDouble() : null,
-      lastPriceUpdate: map['lastPriceUpdate'] != null ? (map['lastPriceUpdate'] as Timestamp).toDate() : null,
+      lastPrice:
+          map['lastPrice'] != null
+              ? (map['lastPrice'] as num).toDouble()
+              : null,
+      lastPriceUpdate:
+          map['lastPriceUpdate'] != null
+              ? (map['lastPriceUpdate'] as Timestamp).toDate()
+              : null,
       varianInfo: map['varianInfo'],
-      createdAt: map['createdAt'] != null ? (map['createdAt'] as Timestamp).toDate() : null,
+      supplierName: map['supplierName'],
+      supplierNumber: map['supplierNumber'],
+      supplierDetail: map['supplierDetail'],
+      suratJalan: map['suratJalan'],
+      createdAt:
+          map['createdAt'] != null
+              ? (map['createdAt'] as Timestamp).toDate()
+              : null,
     );
   }
 
   // Factory khusus untuk data dari Firestore
   factory CategoryModel.fromFirestore(Map<String, dynamic> data, String id) {
-    return CategoryModel.fromMap(data, id: id);
+    return CategoryModel(
+      id: id,
+      namaBarang: data['namaBarang'] ?? '',
+      satuan: data['satuan'] ?? '',
+      lokasi: data['lokasi'] ?? 'Semua',
+      kodeBarang: data['kodeBarang'] ?? '',
+      kuantitas: (data['kuantitas'] ?? 0).toInt(),
+      hargaPerUnit: (data['hargaPerUnit'] ?? 0).toDouble(),
+      jumlahHarga: (data['jumlahHarga'] ?? 0).toDouble(),
+      varianInfo: data['varianInfo'],
+      createdAt:
+          data['createdAt'] != null
+              ? (data['createdAt'] as Timestamp).toDate()
+              : null,
+      supplierName: data['supplierName'],
+      supplierNumber: data['supplierNumber'],
+      supplierDetail: data['supplierDetail'],
+      suratJalan: data['suratJalan'],
+    );
   }
 
-  static final NumberFormat _fmt = NumberFormat.decimalPattern('en_US');
+  static final NumberFormat _fmt = NumberFormat.decimalPattern('id_ID');
 
   String get hargaPerUnitFormatted => _fmt.format(hargaPerUnit);
   String get jumlahHargaFormatted => _fmt.format(jumlahHarga);
 
   static String generateAutoCode() {
-    final now = DateTime.now();
-    final dateCode = DateFormat('ddMMyy').format(now);
-    final random = Random().nextInt(9000) + 1000; // Menghasilkan 4 digit (1000-9999)
-    return 'BRG$dateCode$random';
+    final rand = Random();
+    return 'BRG-${rand.nextInt(90000) + 10000}';
   }
 }

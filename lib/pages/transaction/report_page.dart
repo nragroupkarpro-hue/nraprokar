@@ -9,19 +9,6 @@ import 'package:excel/excel.dart';
 import '../../services/firestore_service.dart';
 import '../../models/transaction_model.dart';
 
-// Model bantuan untuk merangkum data per Item
-class ItemSummary {
-  String itemName;
-  int qtyMasuk = 0;
-  double rpMasuk = 0;
-  int qtyKeluar = 0;
-  double rpKeluar = 0;
-
-  ItemSummary(this.itemName);
-
-  double get totalBersih => rpMasuk - rpKeluar;
-}
-
 class ReportPage extends StatefulWidget {
   const ReportPage({Key? key}) : super(key: key);
 
@@ -37,164 +24,148 @@ class _ReportPageState extends State<ReportPage> {
     decimalDigits: 0,
   );
 
-  // Default filter ke bulan ini
+  // --- FILTER HARIAN (DAY-TO-DAY) ---
   DateTime _selectedDate = DateTime.now();
 
-  void _previousMonth() {
+  void _previousDay() {
     setState(() {
-      _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1);
+      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
     });
   }
 
-  void _nextMonth() {
+  void _nextDay() {
     setState(() {
-      _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1);
+      _selectedDate = _selectedDate.add(const Duration(days: 1));
     });
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
   }
 
   // ==========================================
-  // FUNGSI DOWNLOAD EXCEL (REKAP & DETAIL)
+  // FUNGSI DOWNLOAD EXCEL (LAPORAN HARIAN)
   // ==========================================
   Future<void> _exportExcel(
-    List<ItemSummary> summaries,
     double grandMasuk,
     double grandKeluar,
-    List<TransactionModel> transactions, // TAMBAHAN: Data mentah untuk sheet detail
+    List<TransactionModel> transactions,
   ) async {
     try {
       final excel = Excel.createExcel();
-      
-      // Hapus sheet default bawaan
+
       if (excel.tables.containsKey('Sheet1')) {
-        excel.rename('Sheet1', 'Rekap');
+        excel.rename('Sheet1', 'Laporan Harian');
       }
 
-      // ==========================================
-      // SHEET 1: REKAPITULASI (TOTAL PER BARANG)
-      // ==========================================
-      final Sheet sheetRekap = excel['Rekap'];
-
-      // === HEADER REKAP ===
-      sheetRekap.appendRow([
-        TextCellValue('LAPORAN REKAPITULASI KEUANGAN & STOK'),
-      ]);
-      sheetRekap.appendRow([
-        TextCellValue('Periode:'),
-        TextCellValue(DateFormat('MMMM yyyy').format(_selectedDate)),
-      ]);
-      sheetRekap.appendRow([]); // Baris kosong
-
-      // === JUDUL KOLOM REKAP ===
-      sheetRekap.appendRow([
-        TextCellValue('No.'),
-        TextCellValue('Nama Barang'),
-        TextCellValue('Jumlah (Qty) Masuk'),
-        TextCellValue('Total Pemasukan (Rp)'),
-        TextCellValue('Jumlah (Qty) Keluar'),
-        TextCellValue('Total Pengeluaran (Rp)'),
-        TextCellValue('Sisa Saldo (Rp)'),
-      ]);
-
-      // === DATA BARANG REKAP ===
-      for (int i = 0; i < summaries.length; i++) {
-        final item = summaries[i];
-        sheetRekap.appendRow([
-          IntCellValue(i + 1),
-          TextCellValue(item.itemName),
-          IntCellValue(item.qtyMasuk),
-          IntCellValue(item.rpMasuk.toInt()),
-          IntCellValue(item.qtyKeluar),
-          IntCellValue(item.rpKeluar.toInt()),
-          IntCellValue(item.totalBersih.toInt()),
-        ]);
-      }
-
-      // === TOTAL REKAP ===
-      sheetRekap.appendRow([]); // Baris kosong
-      sheetRekap.appendRow([
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue('TOTAL PEMASUKAN'),
-        IntCellValue(grandMasuk.toInt()),
-      ]);
-      sheetRekap.appendRow([
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue('TOTAL PENGELUARAN'),
-        IntCellValue(grandKeluar.toInt()),
-      ]);
-      sheetRekap.appendRow([
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue(''),
-        TextCellValue('TOTAL BERSIH (Masuk - Keluar)'),
-        IntCellValue((grandMasuk - grandKeluar).toInt()),
-      ]);
-
-      // ==========================================
-      // SHEET 2: DETAIL TRANSAKSI (SEMUA DATA)
-      // ==========================================
-      final Sheet sheetDetail = excel['Detail Transaksi'];
+      final Sheet sheetDetail = excel['Laporan Harian'];
 
       // === HEADER DETAIL ===
       sheetDetail.appendRow([
-        TextCellValue('DATA TRANSAKSI RINCI (PEMASUKAN & PENGELUARAN)'),
+        TextCellValue('LAPORAN TRANSAKSI HARIAN (DAY-TO-DAY)'),
       ]);
       sheetDetail.appendRow([
-        TextCellValue('Periode:'),
-        TextCellValue(DateFormat('MMMM yyyy').format(_selectedDate)),
+        TextCellValue('Tanggal:'),
+        TextCellValue(DateFormat('dd MMMM yyyy').format(_selectedDate)),
       ]);
       sheetDetail.appendRow([]); // Baris kosong
 
-      // === JUDUL KOLOM DETAIL ===
+      // === JUDUL KOLOM ===
       sheetDetail.appendRow([
         TextCellValue('No.'),
-        TextCellValue('Tanggal'),
         TextCellValue('Tipe Transaksi'),
-        TextCellValue('Nama Barang / Judul'),
+        TextCellValue('Judul Transaksi'),
+        TextCellValue('Nama Barang'),
+        TextCellValue('Asal Tempat (Lokasi)'),
         TextCellValue('Jumlah (Qty)'),
         TextCellValue('Satuan'),
         TextCellValue('Harga Satuan (Rp)'),
         TextCellValue('Total (Rp)'),
         TextCellValue('Keterangan / Catatan'),
+        // TIGA KOLOM BARU UNTUK SUPPLIER DAN SURAT JALAN
+        TextCellValue('Nama Supplier'),
+        TextCellValue('No. HP Supplier'),
+        TextCellValue('Alamat Supplier'),
+        TextCellValue('Surat Jalan'),
       ]);
 
-      // Urutkan transaksi berdasarkan tanggal terlama ke terbaru
-      transactions.sort((a, b) => a.date.compareTo(b.date));
+      // Urutkan transaksi berdasarkan waktu
+      transactions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-      // === ISI DATA DETAIL TRANSAKSI ===
+      // === ISI DATA TRANSAKSI ===
       for (int i = 0; i < transactions.length; i++) {
         final t = transactions[i];
         sheetDetail.appendRow([
           IntCellValue(i + 1),
-          TextCellValue(DateFormat('dd-MMM-yyyy').format(t.date)),
           TextCellValue(t.type == 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'),
-          TextCellValue(t.itemName.isNotEmpty ? t.itemName : t.title),
+          TextCellValue(t.title.isNotEmpty ? t.title : '-'),
+          TextCellValue(t.itemName),
+          TextCellValue(t.location),
           IntCellValue(t.quantity.toInt()),
           TextCellValue(t.unit),
           IntCellValue(t.pricePerUnit.toInt()),
           IntCellValue(t.amount.toInt()),
-          TextCellValue(t.description ?? ''),
+          TextCellValue(t.description ?? '-'),
+          // ISI DATA SUPPLIER DAN SURAT JALAN
+          TextCellValue(t.supplierName ?? '-'),
+          TextCellValue(t.supplierNumber ?? '-'),
+          TextCellValue(t.supplierDetail ?? '-'),
+          TextCellValue(t.suratJalan ?? '-'),
         ]);
       }
 
-      // Jadikan sheet 'Rekap' sebagai sheet utama saat Excel dibuka
-      excel.setDefaultSheet('Rekap');
+      // === TOTAL HARIAN ===
+      sheetDetail.appendRow([]);
+      sheetDetail.appendRow([
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue('TOTAL PEMASUKAN HARI INI'),
+        IntCellValue(grandMasuk.toInt()),
+      ]);
+      sheetDetail.appendRow([
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue('TOTAL PENGELUARAN HARI INI'),
+        IntCellValue(grandKeluar.toInt()),
+      ]);
+      sheetDetail.appendRow([
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue('SALDO BERSIH HARI INI'),
+        IntCellValue((grandMasuk - grandKeluar).toInt()),
+      ]);
+
+      excel.setDefaultSheet('Laporan Harian');
 
       final filename =
-          'Laporan_Keuangan_${DateFormat('MMMyyyy').format(_selectedDate)}.xlsx';
+          'Laporan_Harian_${DateFormat('dd_MM_yyyy').format(_selectedDate)}.xlsx';
 
-      // Export berdasarkan platform
       if (kIsWeb) {
-        // Web: Download langsung
         final excelBytes = excel.encode();
         if (excelBytes != null) {
           final blob = html.Blob([excelBytes]);
@@ -205,7 +176,6 @@ class _ReportPageState extends State<ReportPage> {
           html.Url.revokeObjectUrl(url);
         }
       } else {
-        // Mobile/Desktop: Simpan ke file
         final dir = await getApplicationDocumentsDirectory();
         final path = '${dir.path}/$filename';
         final file = File(path);
@@ -218,7 +188,7 @@ class _ReportPageState extends State<ReportPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ File Excel "$filename" berhasil diunduh! Cek 2 Sheet di dalamnya.'),
+            content: Text('✅ Laporan Excel "$filename" berhasil diunduh!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -238,41 +208,72 @@ class _ReportPageState extends State<ReportPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
-          "Laporan Rekapitulasi",
+          "Laporan Day-to-Day",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.teal,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
       ),
       body: Column(
         children: [
           // ==========================================
-          // 1. KONTROL BULAN (HEADER)
+          // 1. KONTROL TANGGAL (HARIAN)
           // ==========================================
           Container(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: Colors.teal),
-                  onPressed: _previousMonth,
+                  icon: Icon(
+                    Icons.arrow_back_ios,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  onPressed: _previousDay,
+                  tooltip: 'Hari Sebelumnya',
                 ),
-                Text(
-                  DateFormat('MMMM yyyy').format(_selectedDate),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: Colors.teal,
+                GestureDetector(
+                  onTap: _pickDate,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_month,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          DateFormat('dd MMMM yyyy').format(_selectedDate),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.arrow_forward_ios, color: Colors.teal),
-                  onPressed: _nextMonth,
+                  icon: Icon(
+                    Icons.arrow_forward_ios,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  onPressed: _nextDay,
+                  tooltip: 'Hari Berikutnya',
                 ),
               ],
             ),
@@ -282,84 +283,62 @@ class _ReportPageState extends State<ReportPage> {
           // 2. STREAM DATA TRANSAKSI
           // ==========================================
           Expanded(
-            child: FutureBuilder<List<TransactionModel>>(
-              // Memanggil data berdasarkan bulan yang dipilih di state
-              future: service.getMonthlyTransactions(
-                _selectedDate.year,
-                _selectedDate.month,
-              ),
+            child: StreamBuilder<List<TransactionModel>>(
+              stream: service.getTransactions(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                List<TransactionModel> transactions = snapshot.data ?? [];
-
-                // Jika kosong, tampilkan UI kosong
-                if (transactions.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.receipt_long,
-                          size: 80,
-                          color: Colors.grey.shade300,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          "Tidak ada transaksi di bulan ini.",
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.teal),
                   );
                 }
 
-                // --- PROSES PERHITUNGAN REKAPITULASI ---
-                Map<String, ItemSummary> summaryMap = {};
+                // FILTER DATA HANYA UNTUK HARI YANG DIPILIH
+                List<TransactionModel> allTransactions = snapshot.data ?? [];
+                List<TransactionModel> dailyTransactions =
+                    allTransactions.where((tx) {
+                      return tx.date.year == _selectedDate.year &&
+                          tx.date.month == _selectedDate.month &&
+                          tx.date.day == _selectedDate.day;
+                    }).toList();
+
                 double grandMasuk = 0;
                 double grandKeluar = 0;
-                  
-                for (var tx in transactions) {
-                  final itemName =
-                      tx.itemName.isNotEmpty ? tx.itemName : 'Barang Lainnya';
 
-                  if (!summaryMap.containsKey(itemName)) {
-                    summaryMap[itemName] = ItemSummary(itemName);
-                  }
-
-                  if (tx.type == 'pemasukan') {
-                    summaryMap[itemName]!.qtyMasuk += tx.quantity.toInt();
-                    summaryMap[itemName]!.rpMasuk += tx.amount;
+                for (var tx in dailyTransactions) {
+                  if (tx.type == 'pemasukan')
                     grandMasuk += tx.amount;
-                  } else if (tx.type == 'pengeluaran') {
-                    summaryMap[itemName]!.qtyKeluar += tx.quantity.toInt();
-                    summaryMap[itemName]!.rpKeluar += tx.amount;
+                  else if (tx.type == 'pengeluaran')
                     grandKeluar += tx.amount;
-                  }
                 }
-              
-                List<ItemSummary> summaryList = summaryMap.values.toList();
-                // Urutkan alfabetis
-                summaryList.sort((a, b) => a.itemName.compareTo(b.itemName));
 
                 double saldoAkhir = grandMasuk - grandKeluar;
 
                 return Column(
                   children: [
                     // =============================================
-                    // 3. KARTU RINGKASAN GLOBAL (ATAS)
+                    // 3. KARTU RINGKASAN HARIAN (ATAS)
                     // =============================================
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          gradient: LinearBinding(saldoAkhir),
+                          gradient: LinearGradient(
+                            colors:
+                                saldoAkhir >= 0
+                                    ? [
+                                      Theme.of(context).colorScheme.primary,
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.primaryContainer,
+                                    ]
+                                    : [
+                                      Colors.orange.shade800,
+                                      Colors.red.shade500,
+                                    ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
@@ -372,10 +351,10 @@ class _ReportPageState extends State<ReportPage> {
                         child: Column(
                           children: [
                             const Text(
-                              "SISA SALDO BERSIH",
+                              "SALDO BERSIH HARI INI",
                               style: TextStyle(
                                 color: Colors.white70,
-                                fontSize: 14,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -417,7 +396,7 @@ class _ReportPageState extends State<ReportPage> {
                     ),
 
                     // ==========================================
-                    // 4. LIST RINCIAN PER BARANG
+                    // 4. LIST DETAIL TRANSAKSI HARIAN
                     // ==========================================
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -425,14 +404,14 @@ class _ReportPageState extends State<ReportPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            "Rincian per Barang",
+                            "Rincian Transaksi Hari Ini",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
                           ),
                           Text(
-                            "${summaryList.length} Item",
+                            "${dailyTransactions.length} Data",
                             style: const TextStyle(color: Colors.grey),
                           ),
                         ],
@@ -441,121 +420,205 @@ class _ReportPageState extends State<ReportPage> {
                     const SizedBox(height: 8),
 
                     Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        itemCount: summaryList.length,
-                        itemBuilder: (context, index) {
-                          final item = summaryList[index];
-                          return Card(
-                            elevation: 1,
-                            margin: const EdgeInsets.only(bottom: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Header Nama Barang
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.teal.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.inventory_2,
-                                          color: Colors.teal,
-                                          size: 20,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          item.itemName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 12),
-                                    child: Divider(height: 1),
-                                  ),
-                                  // Detail Masuk & Keluar
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      _buildItemStatRow(
-                                        "Masuk",
-                                        item.qtyMasuk,
-                                        item.rpMasuk,
-                                        Colors.green,
-                                      ),
-                                      _buildItemStatRow(
-                                        "Keluar",
-                                        item.qtyKeluar,
-                                        item.rpKeluar,
-                                        Colors.red,
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  // Total Bersih Barang
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
+                      child:
+                          dailyTransactions.isEmpty
+                              ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.receipt_long,
+                                      size: 80,
+                                      color: Colors.grey.shade300,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          item.totalBersih >= 0
-                                              ? Colors.blue.shade50
-                                              : Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(6),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      "Tidak ada aktivitas di hari ini.",
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 16,
+                                      ),
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          "Saldo Item:",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        Text(
-                                          currency.format(item.totalBersih),
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color:
-                                                item.totalBersih >= 0
-                                                    ? Colors.blue.shade700
-                                                    : Colors.red.shade700,
-                                          ),
-                                        ),
-                                      ],
+                                  ],
+                                ),
+                              )
+                              : ListView.builder(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                itemCount: dailyTransactions.length,
+                                itemBuilder: (context, index) {
+                                  final trx = dailyTransactions[index];
+                                  final isPemasukan = trx.type == 'pemasukan';
+                                  final cardColor =
+                                      isPemasukan ? Colors.green : Colors.red;
+
+                                  return Card(
+                                    elevation: 1,
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                  ),
-                                ],
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // Header Transaksi
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: cardColor.withOpacity(
+                                                    0.1,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Icon(
+                                                  isPemasukan
+                                                      ? Icons.arrow_downward
+                                                      : Icons.arrow_upward,
+                                                  color: cardColor,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      trx.title.isNotEmpty
+                                                          ? trx.title
+                                                          : (isPemasukan
+                                                              ? 'Stok Masuk'
+                                                              : 'Stok Keluar'),
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 15,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      DateFormat(
+                                                        'HH:mm',
+                                                      ).format(
+                                                        trx.createdAt.toDate(),
+                                                      ),
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Text(
+                                                currency.format(trx.amount),
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                  color: cardColor,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                            child: Divider(height: 1),
+                                          ),
+
+                                          // Info Detail: Tempat, Barang, Qty, Deskripsi
+                                          _buildInfoRow(
+                                            Icons.inventory_2,
+                                            "Barang",
+                                            trx.itemName,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          _buildInfoRow(
+                                            Icons.store,
+                                            "Tempat",
+                                            trx.location,
+                                            isHighlight: true,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          _buildInfoRow(
+                                            Icons.tag,
+                                            "Jumlah",
+                                            "${trx.quantity.toInt()} ${trx.unit}  (Rp ${currency.format(trx.pricePerUnit)}/unit)",
+                                          ),
+
+                                          if (trx.description != null &&
+                                              trx.description != '-' &&
+                                              trx.description!.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            _buildInfoRow(
+                                              Icons.description,
+                                              "Catatan",
+                                              trx.description!,
+                                            ),
+                                          ],
+
+                                          // --- TAMPILAN FIELD BARU (SUPPLIER & SURAT JALAN) ---
+                                          if (trx.supplierName != null &&
+                                              trx.supplierName != '-' &&
+                                              trx.supplierName!.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            _buildInfoRow(
+                                              Icons.local_shipping,
+                                              "Supplier",
+                                              trx.supplierName!,
+                                            ),
+                                          ],
+                                          if (trx.supplierNumber != null &&
+                                              trx.supplierNumber != '-' &&
+                                              trx
+                                                  .supplierNumber!
+                                                  .isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            _buildInfoRow(
+                                              Icons.phone,
+                                              "No. Telp",
+                                              trx.supplierNumber!,
+                                            ),
+                                          ],
+                                          if (trx.supplierDetail != null &&
+                                              trx.supplierDetail != '-' &&
+                                              trx
+                                                  .supplierDetail!
+                                                  .isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            _buildInfoRow(
+                                              Icons.map,
+                                              "Alamat",
+                                              trx.supplierDetail!,
+                                            ),
+                                          ],
+                                          if (trx.suratJalan != null &&
+                                              trx.suratJalan != '-' &&
+                                              trx.suratJalan!.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            _buildInfoRow(
+                                              Icons.receipt,
+                                              "Surat Jalan",
+                                              trx.suratJalan!,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            ),
-                          );
-                        },
-                      ),
                     ),
 
                     // ==========================================
@@ -564,7 +627,7 @@ class _ReportPageState extends State<ReportPage> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.surface,
                         boxShadow: [
                           BoxShadow(
                             color: Colors.grey.shade200,
@@ -578,28 +641,29 @@ class _ReportPageState extends State<ReportPage> {
                         height: 50,
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           icon: const Icon(Icons.download, color: Colors.white),
-                          label: Text(
-                            'Download Excel (${DateFormat('MMM yyyy').format(_selectedDate)})',
-                            style: const TextStyle(
+                          label: const Text(
+                            'Download Excel Hari Ini',
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
                           ),
-                          // KIRIM DATA TRANSAKSI MENTAH JUGA KE EXPORT EXCEL
                           onPressed:
-                              () => _exportExcel(
-                                summaryList,
-                                grandMasuk,
-                                grandKeluar,
-                                transactions, // <--- Data detail disertakan
-                              ),
+                              dailyTransactions.isEmpty
+                                  ? null
+                                  : () => _exportExcel(
+                                    grandMasuk,
+                                    grandKeluar,
+                                    dailyTransactions,
+                                  ),
                         ),
                       ),
                     ),
@@ -614,22 +678,6 @@ class _ReportPageState extends State<ReportPage> {
   }
 
   // --- Widget Bantuan ---
-  LinearGradient LinearBinding(double saldoAkhir) {
-    if (saldoAkhir >= 0) {
-      return LinearGradient(
-        colors: [Colors.teal.shade700, Colors.teal.shade400],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else {
-      return LinearGradient(
-        colors: [Colors.orange.shade800, Colors.red.shade500],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    }
-  }
-
   Widget _buildMiniStat(
     String title,
     double amount,
@@ -662,26 +710,30 @@ class _ReportPageState extends State<ReportPage> {
     );
   }
 
-  Widget _buildItemStatRow(String label, int qty, double amount, Color color) {
-    return Column(
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, {
+    bool isHighlight = false,
+  }) {
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Icon(icon, size: 16, color: Colors.grey),
+        const SizedBox(width: 8),
         Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
+          "$label: ",
+          style: const TextStyle(fontSize: 13, color: Colors.grey),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
+              color: isHighlight ? Colors.blue.shade700 : Colors.black87,
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Qty: $qty',
-          style: const TextStyle(fontSize: 12, color: Colors.black87),
-        ),
-        Text(
-          currency.format(amount),
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
         ),
       ],
     );

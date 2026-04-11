@@ -18,6 +18,12 @@ class TransactionModel {
   DateTime date;
   String? description;
 
+  // --- FIELD BARU ---
+  String? supplierName;
+  String? supplierDetail;
+  String? supplierNumber;
+  String? suratJalan;
+
   TransactionModel({
     this.id,
     this.title = '',
@@ -34,6 +40,10 @@ class TransactionModel {
     required this.createdAt,
     required this.date,
     this.description,
+    this.supplierName,
+    this.supplierDetail,
+    this.supplierNumber,
+    this.suratJalan,
   });
 
   factory TransactionModel.fromMap(Map<String, dynamic> map, String id) {
@@ -53,12 +63,17 @@ class TransactionModel {
       createdAt: map['createdAt'] ?? Timestamp.now(),
       date: (map['date'] as Timestamp).toDate(),
       description: map['description'],
+      // Tarik field baru dari database
+      supplierName: map['supplierName'],
+      supplierDetail: map['supplierDetail'],
+      supplierNumber: map['supplierNumber'],
+      suratJalan: map['suratJalan'],
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'title': title,
+      'title': title.isEmpty ? '-' : title,
       'itemName': itemName,
       'unit': unit,
       'location': location,
@@ -71,12 +86,18 @@ class TransactionModel {
       'categoryId': categoryId,
       'createdAt': createdAt,
       'date': date,
-      'description': description,
+      // --- PERBAIKAN DATA NULL: Mengubah null / kosong menjadi strip "-" ---
+      'description': (description?.isEmpty ?? true) ? '-' : description,
+      'supplierName': (supplierName?.isEmpty ?? true) ? '-' : supplierName,
+      'supplierDetail':
+          (supplierDetail?.isEmpty ?? true) ? '-' : supplierDetail,
+      'supplierNumber':
+          (supplierNumber?.isEmpty ?? true) ? '-' : supplierNumber,
+      'suratJalan': (suratJalan?.isEmpty ?? true) ? '-' : suratJalan,
     };
   }
 
   static final NumberFormat _fmt = NumberFormat.decimalPattern('id_ID');
-
   String get pricePerUnitFormatted => _fmt.format(pricePerUnit);
   String get totalPriceFormatted => _fmt.format(totalPrice);
   String get amountFormatted => _fmt.format(amount);

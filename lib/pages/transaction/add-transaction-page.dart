@@ -162,6 +162,39 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
       return;
     }
 
+    // KONFIRMASI SEBELUM SIMPAN
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text(
+              'Konfirmasi Simpan Transaksi',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: Text(
+              'Apakah data transaksi sudah benar?\n\nJenis: ${_type == 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}\nBarang: $name\nJumlah: $qty $unit\nTotal: Rp ${total.toStringAsFixed(0)}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Periksa Lagi'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      _type == 'pemasukan' ? Colors.green : Colors.red,
+                ),
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Ya, Simpan',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+    );
+    if (confirm != true) return;
+
     final trx = TransactionModel(
       title: title.isEmpty ? (_foundCategory?.namaBarang ?? '') : title,
       itemCode: code,
