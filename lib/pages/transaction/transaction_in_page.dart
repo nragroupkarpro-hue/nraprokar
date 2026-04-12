@@ -176,10 +176,6 @@ class _TransactionInPageState extends State<TransactionInPage> {
   DateTime? _selectedFilter;
   final descriptionFilterController = TextEditingController();
 
-  void _resetPage() {
-    setState(() => _currentPage = 0);
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

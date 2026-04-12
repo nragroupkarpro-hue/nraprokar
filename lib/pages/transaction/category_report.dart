@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../services/firestore_service.dart';
 import '../../models/category_model.dart';
@@ -26,8 +24,6 @@ class _CategoryPageState extends State<CategoryPage> {
   final kodeBarangFilterController = TextEditingController();
 
   /// filtering options
-  int _filterMode = 0; // 0=all, 1=month
-  DateTime? _selectedFilter; // date picked for filtering
 
   @override
   void dispose() {
@@ -117,20 +113,16 @@ class _CategoryPageState extends State<CategoryPage> {
                         final namaFilter =
                             namaBarangFilterController.text.toLowerCase();
                         if (namaFilter.isNotEmpty) {
-                          keep &=
-                              cat.namaBarang?.toLowerCase().contains(
-                                namaFilter,
-                              ) ??
-                              false;
+                          keep &= cat.namaBarang.toLowerCase().contains(
+                            namaFilter,
+                          );
                         }
                         final kodeFilter =
                             kodeBarangFilterController.text.toLowerCase();
                         if (kodeFilter.isNotEmpty) {
-                          keep &=
-                              cat.kodeBarang?.toLowerCase().contains(
-                                kodeFilter,
-                              ) ??
-                              false;
+                          keep &= cat.kodeBarang.toLowerCase().contains(
+                            kodeFilter,
+                          );
                         }
                         return keep;
                       }).toList();

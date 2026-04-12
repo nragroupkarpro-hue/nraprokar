@@ -5,6 +5,8 @@ import 'dart:math';
 class CategoryModel {
   final String? id;
   final String namaBarang;
+  final String? judul; // FIELD BARU
+  final String? deskripsi; // FIELD BARU
   final String satuan;
   final String lokasi;
   final String kodeBarang;
@@ -25,6 +27,8 @@ class CategoryModel {
   CategoryModel({
     this.id,
     required this.namaBarang,
+    this.judul,
+    this.deskripsi,
     required this.satuan,
     required this.lokasi,
     required this.kodeBarang,
@@ -45,6 +49,8 @@ class CategoryModel {
   Map<String, dynamic> toMap() {
     return {
       'namaBarang': namaBarang,
+      'judul': judul,
+      'deskripsi': deskripsi,
       'satuan': satuan,
       'lokasi': lokasi,
       'kodeBarang': kodeBarang,
@@ -64,10 +70,11 @@ class CategoryModel {
     };
   }
 
-  // Digunakan saat menulis ke Firestore (menambahkan server timestamp)
   Map<String, dynamic> toFirestore() {
     return {
       'namaBarang': namaBarang,
+      'judul': judul,
+      'deskripsi': deskripsi,
       'satuan': satuan,
       'lokasi': lokasi,
       'kodeBarang': kodeBarang,
@@ -83,14 +90,19 @@ class CategoryModel {
       'supplierNumber': supplierNumber,
       'supplierDetail': supplierDetail,
       'suratJalan': suratJalan,
+      'totalModal': totalModal,
+      'lastPrice': lastPrice,
+      'lastPriceUpdate':
+          lastPriceUpdate != null ? Timestamp.fromDate(lastPriceUpdate!) : null,
     };
   }
 
-  // Factory untuk data dari Map umum
   factory CategoryModel.fromMap(Map<String, dynamic> map, {String? id}) {
     return CategoryModel(
       id: id ?? map['id'],
       namaBarang: map['namaBarang'] ?? '',
+      judul: map['judul'],
+      deskripsi: map['deskripsi'],
       satuan: map['satuan'] ?? '',
       lokasi: map['lokasi'] ?? '',
       kodeBarang: map['kodeBarang'] ?? '',
@@ -118,17 +130,27 @@ class CategoryModel {
     );
   }
 
-  // Factory khusus untuk data dari Firestore
   factory CategoryModel.fromFirestore(Map<String, dynamic> data, String id) {
     return CategoryModel(
       id: id,
       namaBarang: data['namaBarang'] ?? '',
+      judul: data['judul'],
+      deskripsi: data['deskripsi'],
       satuan: data['satuan'] ?? '',
       lokasi: data['lokasi'] ?? 'Semua',
       kodeBarang: data['kodeBarang'] ?? '',
       kuantitas: (data['kuantitas'] ?? 0).toInt(),
       hargaPerUnit: (data['hargaPerUnit'] ?? 0).toDouble(),
       jumlahHarga: (data['jumlahHarga'] ?? 0).toDouble(),
+      totalModal: (data['totalModal'] ?? 0.0).toDouble(),
+      lastPrice:
+          data['lastPrice'] != null
+              ? (data['lastPrice'] as num).toDouble()
+              : null,
+      lastPriceUpdate:
+          data['lastPriceUpdate'] != null
+              ? (data['lastPriceUpdate'] as Timestamp).toDate()
+              : null,
       varianInfo: data['varianInfo'],
       createdAt:
           data['createdAt'] != null
@@ -141,13 +163,13 @@ class CategoryModel {
     );
   }
 
-  static final NumberFormat _fmt = NumberFormat.decimalPattern('id_ID');
-
-  String get hargaPerUnitFormatted => _fmt.format(hargaPerUnit);
-  String get jumlahHargaFormatted => _fmt.format(jumlahHarga);
-
   static String generateAutoCode() {
     final rand = Random();
     return 'BRG-${rand.nextInt(90000) + 10000}';
   }
+
+  static final NumberFormat _fmt = NumberFormat.decimalPattern('id_ID');
+
+  String get hargaPerUnitFormatted => _fmt.format(hargaPerUnit);
+  String get jumlahHargaFormatted => _fmt.format(jumlahHarga);
 }
