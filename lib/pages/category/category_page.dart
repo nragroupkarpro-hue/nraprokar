@@ -74,7 +74,7 @@ class _CategoryPageState extends State<CategoryPage> {
         title: Text(
           isSelectionMode
               ? "${selectedIds.length} dipilih"
-              : "Data Barang & Stok",
+              : "Data Barang & Stok 1",
           style: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 20,
